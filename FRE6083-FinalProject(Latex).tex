@@ -1,0 +1,780 @@
+\documentclass[fontsize=12pt]{article} 
+
+\usepackage[T1]{fontenc} % Use 8-bit encoding that has 256 glyphs
+%\usepackage{fourier} % Use the Adobe Utopia font for the document - comment this line to return to the LaTeX default
+%\usepackage[english]{babel} % English language/hyphenation
+\usepackage[latin1]{inputenc}
+\usepackage[english]{babel}
+\usepackage{amsmath,amsfonts,amsthm} % Math packages
+\usepackage{lipsum} % Used for inserting dummy 'Lorem ipsum' text into the template
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{authblk}
+\usepackage{sectsty} % Allows customizing section commands
+\allsectionsfont{\normalfont\scshape} % Make all sections centered, the default font and small caps
+\usepackage{fancyhdr}
+\usepackage{vmargin}
+\setmarginsrb{3 cm}{2.5 cm}{3 cm}{2.5 cm}{1 cm}{1.5 cm}{1 cm}{1.5 cm}
+
+\title{Fast Fourier Transform $\&$ Heston Model }	% Title
+\author{Cristobal Gonzalez - Deniz Kural - Liam Trodden}	 % Author
+\date{\parbox{\linewidth}{\centering \today \endgraf}} % Date
+\affil{Professor Daniel Totouom}
+
+\makeatletter
+\let\thetitle\@title
+\let\theauthor\@author
+\let\thedate\@date
+\let\theaffil\@affil
+\makeatother
+
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{\theauthor}
+\lhead{[\thetitle]}
+\rfoot{\thepage}
+\lfoot{MSc in Financial Engineering, NYU}
+\setlength{\headheight}{13.6pt} % Customize the height of the header
+
+\numberwithin{equation}{section} % Number equations within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+\numberwithin{figure}{section} % Number figures within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+\numberwithin{table}{section} % Number tables within sections (i.e. 1.1, 1.2, 2.1, 2.2 instead of 1, 2, 3, 4)
+
+%----------------------------------------------------------------------------------------
+
+\newcommand{\horrule}[1]{\rule{\linewidth}{#1}} % Create horizontal rule command with 1 argument of height
+\renewcommand{\footrulewidth}{0.4pt}
+
+\title{	
+\normalfont \normalsize 
+ \includegraphics[scale = 0.2]{NYULogo}\\[2.0 cm]
+\textsc{\LARGE New York University} \\ [25pt] 
+\textsc{MSc in Financial Engineering} \\ [25pt] 
+\horrule{0.5pt} \\[0.4cm] 
+\huge Fourier Transform and Heston Model in Option Pricing \\ 
+\horrule{2pt} \\[2.0cm] 
+}
+
+\author{\theauthor} 
+
+\date{12 December, 2019} 
+
+%\affil{\@affil}
+
+\begin{document}
+
+%\maketitle 
+%\newpage
+
+%%%%
+
+
+%\listoftables
+
+%%%%
+
+%\begin{document}
+
+\maketitle
+
+
+\newpage
+
+\tableofcontents
+%\listoffigures
+\newpage
+
+\section{Introduction} \label{Introduction}
+ 
+
+\subsection{Motivation} \label{Motivation}
+
+	While the most notable contribution to the history of quantitative option pricing certainly comes from Black and Scholes in 1973, researchers soon noticed that prices found with the Black-Scholes method tend to differ from market prices. This would eventually lead to stochastic volatility models. In this work will look at that of Steve Heston (1993), an important model that would model volatility as stochastic and time-dependent. This model was able to price option in closed form, but doing so computationally proved difficult. Another major contribution to option pricing then came with Carr and Madan in 1999 with their version of the Fast Fourier transform, which was able to implement the dynamics of the Heston model for greatly improved efficiency.
+
+
+	This paper intends to analyze and compare European call option pricing using both the closed form Heston model and the Fast Fourier Transform method (Carr-Madan). We intend to determine when it is appropriate to use FFT methods for pricing European calls based on the efficiency of its use with a variety of calibration techniques. 
+
+
+	To test the Carr-Madan FFT, we implement a model in Python for the closed form Heston method. Then, we calibrate the parameters based on market data using two calibration methods: one that minimizes squared differences in price between the model and the market, and another that does the same with option implied volatility.
+
+
+	Next, we implement a model in Python based on the Carr-Madan FFT, calling on the characteristic function as defined by Heston stock dynamics. After calibrating this model similarly to with the closed form model, we compare the accuracy and computational efficiency of both models. While it is known that the FFT model is fast and flexible, we intend to use these results to investigate the potential errors or shortcomings of the FFT and pinpoint where and why those might arise. 
+
+
+\subsection{Data} \label{Data}
+
+	The data used in this paper are S\&P 500 index options from January to December of 2018. Underlying values, interest rates, and the option information (prices, maturities, strikes, implied volatility, and vega) were downloaded from the Wharton Research Data Services. The prices are the lowest closing Ask across all the exchanges available in the platform. 
+	
+	To make the analysis more simple, we took call options with three months of maturity, in the window of 89 to 94 days. Therefore the models' performances will be showed against only different strike prices. Since the data is obtained from many different exchanges, there is information for a wide variety of strikes with competitive prices. There are 98 days of option information and around 91 strikes per day, being a total of almost 9000 call options.
+
+
+\subsection{Parameters} \label{Parameters}
+
+	Before using the model with data, we test the sensitivity of both models to changes in rho and volatility of the volatility. For the other input parameters, there are general principles that can serve as guidance to choose initial values before calibrating. Choosing values for these two parameters can be more obscure. The below plots visualize this analysis. \\
+	
+	First for the Heston Closed Form:
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{HestonParamVolvol.png}
+  \caption{Closed Form Sensitivity to sigma}
+  \label{fig:CF sensitivity}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{HestonParamRho.png}
+  \caption{Closed Form Sensitivity to Rho}
+  \label{fig:CF sensitivity}
+\end{figure}
+
+	And for the Fast Fourier Transform:
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{FFTParamVolvol.png}
+  \caption{Fast Fourier Sensitivity to Sigma}
+  \label{fig:FFT sensitivity}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{FFTParamRho.png}
+  \caption{Fast Fourier Sensitivity to Rho}
+  \label{fig:FFT sensitivity}
+\end{figure}
+
+
+
+\section{Heston Model} \label{Heston Model}
+
+
+
+\subsection{Description} \label{Description1}
+
+Heston model was developed by Professor Steve Heston in 1993. The model is based on a stochastic volatility assumption, and is used primarily for pricing European options. In contrast to the Black-Scholes model, Heston's model does not hold volatility constant. Instead, it assumes volatility is arbitrary. One of the special characteristics of this model is that it provides closed-form solution for European options. Thus, when there is a known correlation between a stock's price and its volatility, the solution can be obtained.
+
+
+\subsection{Calculation of Heston Model} \label{Calculation of Heston Model}
+	The model can be shown as following the dynamics:
+
+\begin{equation}
+dS_t=\mu S_t dt+\sqrt{V_t} S_t dW_t	
+\end{equation}
+
+\begin{equation}
+dV_t=\kappa (\theta-V_t) dt+\sigma \sqrt{V_t} dZ_t	
+\end{equation}
+
+\begin{equation}
+dW_t dZ_t=\rho dt	
+\end{equation}
+
+The parameters in Equations (2.1),(2.2) and (2.3) are clarified below,
+
+$\mu$ is the drift coefficient of the stock price, 
+
+$\sigma$ is the volatility of the variance diffusion,
+
+$\theta$ is the long-term mean of variance,
+
+$\kappa$ is the rate of mean reversion,
+
+$\rho$  is the correlation between the Brownian motions,
+
+$S_t$ is the price process,
+
+$V_t$ is the variance process.
+
+\bigskip
+
+Equation (2.3) indicates leverage effect, which shows that returns and implied volatility are negatively correlated.
+	To create this model, Heston (1993) assumed a log-normal distribution for the underlying stock and Cox-Ingersoll-Ross process (CIR process) (1985) for $V_t$ [1]. As mentioned, this model has some advantages over Black-Scholes Model. Volatility affects can not be ignored in financial markets for the duration of the option's life and Heston model takes this into account where as Black-Scholes does not. Moreover, Heston models volatility as a mean reverting process which is observed in financial markets [2]. Lastly, he shows correlation between underlying asset returns and volatility which is also observed in financial market movements. 
+	
+\subsection{Closed Form of Heston Model} \label{Closed Form of Heston Model}
+
+	Heston (1993) assumed the solution form would be similar to the Black-Scholes model.  The formula for present value of European call option can be seen at Equation (2.4) below:
+
+\begin{equation}
+C_0 = S_0 e^{-qT} P_1 - K e^{-rT} P_2  
+\end{equation}
+
+	So, to calculate call value, both $P_1$ and $P_2$ must be found. Thus, call value in Heston model can be calculated by finding these values with the usage of Equations (2.1), (2.2), (2.3) and substituting these values inside the Equation (2.4). 
+
+The give probabilities for $P_1$ and $P_2$ can be found via Fourier Inversion Transformation,
+
+\begin{equation}
+P_j = \frac{1}{2} + \frac{1}{\pi} \int_{\phi=0}^{+\infty} Re [\frac{e^{-i\phi ln K}f_j(\phi | x_0, \nu_0, T)}{i\phi}]d\phi
+\end{equation}
+
+Heston (1993) uses the characteristic function as in Equation (2.6),
+
+\begin{equation}
+f_j(\phi | x_0, \nu_0, T)= exp[C_j(\phi | T) + D_j(\phi | T)\nu_0 + i\phi x_0]
+\end{equation}
+
+where the parameters of  characteristic function can be seen in the below equations,
+
+\begin{equation}
+C_j(\phi | T)=i\phi(r-q)T + \frac{a}{\xi^2}[(b_j - i\phi \rho \xi + d_j)T - 2 ln \frac{1- g_j e^{d_j T}}{1-g_j}]
+\end{equation}
+
+\begin{equation}
+D_j(\phi | T)= [\frac{b_j - i\phi \rho \xi + d_j}{\xi^2}] [\frac{1- e^{d_j T}}{1-g_j e^{d_j T}}]
+\end{equation}
+
+\begin{equation}
+g_j(\phi)=\frac{b_j - i\phi \rho \xi + d_j}{b_j - i\phi \rho \xi - d_j}
+\end{equation}
+
+\begin{equation}
+d_j(\phi)=\sqrt{(i\phi \rho \xi - b_j)^2 - \xi^2 (2 i \phi u_j - \phi^2)}
+\end{equation}
+
+\begin{equation}
+u_1=\frac{1}{2}
+\end{equation}
+
+\begin{equation}
+u_2=-\frac{1}{2}
+\end{equation}
+
+\begin{equation}
+a=\theta \omega
+\end{equation}
+
+\begin{equation}
+b_1=\theta + \psi - \rho \xi
+\end{equation}
+
+\begin{equation}
+b_2=\theta + \psi 
+\end{equation}
+
+
+
+\subsection{Numerical Integration Methods} \label{Numerical Integration Methods}
+
+\subsubsection{Simpson's Rule} \label{Simpson's Rule}
+ 
+	There are different methods to solve Equation (2.5) as well, including Simpson's rule. The logic behind the Simpson's rule is that the function for numerical integration is divided into two equal parts. As can be seen in the below Equation (2.16), the partition points are specified as a, a+h, and a+2h [3]. 
+
+\begin{equation}
+\int_{a}^{a+2h} f(x)dx \approx \dfrac{h}{3} [f(a)+4f(a+h)+f(a+2h)]
+\end{equation}
+
+The error of this numerical integration method can be also found and can be seen from the Equation (2.17) and (2.18),
+
+\begin{equation}
+f(a+h)= f(a)+ h f'(a)+\dfrac{1}{2!} h^2 f''(a)+\dfrac{1}{3!} h^3 f'''(a)+....
+\end{equation}
+\begin{equation}
+f(a+2h)= f(a)+2hf'(a)+ 2 h^2 f''(a)+\dfrac{4}{3} h^3 f'''(a)+......
+\end{equation}
+
+With defining $F(x)=\int_{a}^{x}f(t)dt$ and using Taylor series definition, equation can be modified as,
+\begin{equation}
+F(a+2h)= F(a)+2 h F(a)+ 2 h^2 F''(a)+\dfrac{4}{3} h^3 F'''(a)+\dfrac{2}{3} h^4 F^{(4)}+.......
+\end{equation}
+
+Then, using $F^{(n+1)}(a)=f^{(n)}(a)$,
+\begin{equation}
+F(a+2h)= F(a)+2 h F(a)+ 2 h^2 F''(a)+\dfrac{4}{3} h^3 F'''(a)+\dfrac{2}{3} h^4 F^{(4)}+.......
+\end{equation}
+
+Subtracting RHS of Equation (2.16) from Equation (2.20), error formula can be found as,
+\begin{equation}
+Error = -\dfrac{h^5}{90} f^{(4)} (\xi)
+\end{equation}
+Thus, final form Simpson rule can be observed at Equation (2.22) with error formula in Equation (2.23),
+\begin{equation}
+\int_{a}^{b} f(x)dx \approx \dfrac{b-a}{6} [f(a)+4f (\dfrac{a+b}{2})+f(b)] 
+\end{equation}
+\begin{equation}
+Error= -\dfrac{1}{90} (\dfrac{b-a}{2})^5 f^{(4)} (\xi), \\ \xi \in (a,a+2h)
+\end{equation}
+
+In order to find the integral of Heston, Equation (2.5) should be calculated. The implementation of this has been done in Python. 
+
+
+\subsection{Calibration} \label{Calibration1}
+
+\subsubsection{Calibration Method Theory} \label{Calibration Theory}
+
+There are six parameters that need to be estimated in Heston model. These are $ \kappa , \theta, \sigma, V_0, \rho \, and  \, \lambda.$  The estimation of these parameters are crucial since even small change in these values will pose a great impact on the correctness of the price estimation. A popular approach to find optimal values is to minimize the difference between the model and real market prices [3]. The minimization is solved as nonlinear least squares optimization problem. Thus, corresponding formula for least square method can be observed at Equation (2.24),
+\begin{equation}
+min_\Omega S(\Omega)=min_\Omega \sum^N_{i=1} [C^{\Omega}_i(K_i,T_i)	-C^{M}_i(K_i,T_i)]^2
+\end{equation}
+
+where  N is the number of options , $\Omega$ is a vector of parameter values, $C^{\Omega}_i(K_i,T_i)$  and $ C^{M}_i(K_i,T_i)$ are prices the model and market prices for  the $i_{th}$ option,  strike $K_i$ and maturity $T_i$. 
+
+	Another popular approach for minimization function can be observed at the Equation (2.25). In this case, the minimization is done based on implied volatility. So, the $vega$ term can be seen in the denominator of Equation (2.25) as the $vega$ of $i_{th}$ option in market. This approach is used later, in \ref{Comparison of Calibration Methods} 
+\begin{equation}
+min_\Omega S(\Omega)=min_\Omega \sum^N_{i=1} \dfrac{ [C^{\Omega}_i(K_i,T_i)	-C^{M}_i(K_i,T_i)]^2}{vega_i^M}
+\end{equation}
+
+For the calibration of model, sequential least squares method will be used. This is selected since sequential quadratic programming is a crucial tool for solving non-linear optimization problems in the real world. General problem in sequential quadratic method can be observed below at Equation (2.26) [5]:
+\begin{equation}
+min f(x) \, such \, that \,  h(x)=0 \,  and \,  g(x) \leq 0
+\end{equation}
+where x indicates a vector and f(x), g(x) and h(x) are potentially nonlinear functions. Moreover,  Lagrangian function for this problem can be defined as follows,
+\begin{equation}
+\mathcal{L}(x,\lambda,\sigma)=f(x)-\lambda^T(b(x)-(y_i)^2)-\sigma^Tc(x)
+\end{equation}
+where $\lambda$ and $\sigma$ are Lagrange multipliers. d(k) shows an incremental change to the objective function, so a  minimization sub-problem can be obtained with d(k) and this problem is quadratic and thus must be solved with non-linear methods such as sequential least squares method. The subproblem is shown in the following Equations from (2.28) to (2.31),	
+\begin{equation}
+min_d \,such \, that
+\end{equation}
+\begin{equation}
+f(x_k)+\nabla f(x_k)^Td+\dfrac{1}{2}d^T\nabla^2_{xx}\mathcal{L}(x_k,\lambda_k,\sigma_k)d
+\end{equation}
+\begin{equation}
+b(x_k)+\nabla b(x_k)^Td \geq 0
+\end{equation}
+\begin{equation}	
+c(x_k)+\nabla c(x_k)^Td =0
+\end{equation}
+Note that sequential least squares method is implemented in Python with \textit{minimize(method='SLSQP') } function.
+
+\subsubsection{Calibration Results}
+To calibrate the Heston closed form model, we use the first method, that of minimizing squared difference in prices. Unlike the Fast Fourier model, which will be explained later, to calibrate the Heston closed form we give the model one set of inputs for one output. Since computations of this took so long, we used a total of 545 data points from the first month of data, coming from eight different days.
+
+We ran it with the following initial parameters:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Initial Parameters} \\
+\hline
+Mean reversion $\kappa$ & 1.5 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.4 \\ \hline
+Volatility of the volatility $\sigma$ & 0.6 \\ \hline
+Long-term mean of variance $\theta$ & 0.03 \\ \hline
+Variance initial value $V_0$ & 0.014 \\ \hline
+\end{tabular}
+\caption{Initial parameter for the calibration.}
+\label{tabla:Initial Parameters Closed Form}
+\end{figure}
+
+For better results, it is important to use somewhat realistic initial parameters. We took $V_0$ as 0.014, since this is equal to ${(12\%)}^2$ , with 12\% being a realistic volatility for an equity like the S\&P 500. Similarly, we used a $\theta$ near that number. Since there is a historically observed negative correlation between risk and prices, we used a negative $\rho$.
+
+
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Calibrated Parameters} \\
+\hline
+Mean reversion $\kappa$ & 0.0000 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.6574 \\ \hline
+Volatility of the volatility $\sigma$ & 0.4303 \\ \hline
+Long-term mean of variance $\theta$ & 0.0282 \\ \hline
+Variance initial value $V_0$ & 0.0144 \\ \hline
+\end{tabular}
+\caption{Calibrated parameter.}
+\label{tabla:Calibrated Parameters Closed Form}
+\end{figure}
+
+From the calibrated model, we took an aggregate (mean) of the error terms:
+
+\begin{center}
+\framebox[6cm][c]{Error Function = 11.8363}	
+\end{center}
+
+
+\section{Fast Fourier Transform} \label{Fast Fourier Transform}
+
+\subsection{Description} \label{Description2}
+	
+	The idea of using Fast Fourier Transform (FFT) for pricing options comes from Carr and Madan's work, published in 1999 [4].  In their paper, they developed a new technique that uses FFT for valuing options more efficiently. Their technique uses the characteristic function of the risk-neutral density, similar to older techniques assume. Then, they develop an expression for the Fourier Transform of the option price. Finally, they use an algorithm of an inverse Fourier transform to solve the option price numerically. 
+
+The basic definition of Fourier Transform and inverse Fourier Transform  can be seen below at Equation (3.1) and (3.2), correspondingly ,
+\begin{equation}
+\mathfrak{F}{f(x)}=\int_{-\infty}^{\infty } e^{i \phi x}f(x)dx=F(\phi)
+\end{equation}
+\begin{equation}
+\mathfrak{F}^{-1}{f(x)}=\dfrac{1}{2\pi} \int_{-\infty}^{\infty } e^{-i \phi x}F(\phi)d\phi=f(x)
+\end{equation}
+	In these equations, f(x) represents the log return natural density function and $F(\phi)$ represents the characteristic function. Carr and Madan (1999) developed analytical expressions for the  Fourier transform of an option price. So, as in the paper if we select k as the log of the strike price K and if we choose $C_T(k)$ as the desired value of a T maturity call option with strike $e^{(k)}$, the risk neutral density of log price  $s_T$ be $q_T(s)$,  the characteristic function will be,
+\begin{equation}
+\phi_T(u)=\int_{-\infty}^{\infty } e^{i u s} q_T(s)ds
+\end{equation}
+Then, $C_t(k)$ can be written as,
+\begin{equation}
+C_T(k)=\int_{k}^{\infty } e^{-rT} (e^s-e^k) q_T(s)ds
+\end{equation}
+At this point, since $C_t(k)$ is observed to be not square integrable, call price is modified to be square integrable as can be observed in Equation (3.5),
+\begin{equation}
+c_T(k)=e^{\alpha k} C_T(k) \, for \,  \alpha>0
+\end{equation}
+
+After this modification, $c_t(k)$ is now square integrable in k over real line. Thus, we can calculate Fourier and Inverse Fourier Transform of , $c_t(k)$ which can be seen at Equations (3.6) and (3.7),
+
+
+\begin{equation}
+F_{c_T}(\phi)=\int_{-\infty}^{\infty }e^{	i \phi k} c_T(k)dk
+\end{equation}
+\begin{equation}
+c_T(k)=\dfrac{1}{2\pi} \int_{-\infty}^{\infty }	e^{-i \phi k} F_{c_T}(\phi)d\phi
+\end{equation}
+
+By substituting  Inverse Fourier of $c_T(k)$ (Equation (3.7)) into Equation (3.5) , we get
+\begin{equation}
+C_T(k)=e^{-\alpha k} c_T(k)
+\end{equation}
+\begin{equation}
+=e^{-\alpha k} \dfrac{1}{2\pi} \int_{-\infty}^{\infty }e^{-i \phi k} F_{c_T}(\phi)d\phi
+\end{equation}
+\begin{equation}
+=e^{-\alpha k} \dfrac{1}{\pi} \int_{0}^{\infty }e^{-i \phi k} F_{c_T}(\phi)d\phi
+\end{equation}
+
+Thus, $F_{c_T}(\phi)$ expression is determined as follows:
+\begin{equation}
+F_{c_T}(\phi)=\int_{-\infty}^{\infty }e^{\alpha k} e^{i \phi k} e^{-r T}\int_{k}^{\infty }(e^{x_T}-e^{k}f_T(x_T)dx_Tdk
+\end{equation}
+\begin{equation}
+=\int_{-\infty}^{\infty }f_T(x_T) e^{-r T}\int_{-\infty}^{x_T }(e^{x_T+\alpha k}-e^{(\alpha+1)k}) e^{i \phi k}dkdx_T
+\end{equation}
+\begin{equation}
+=\dfrac{e^{-r T}}{\alpha^2+\alpha-\phi^2+i(2\alpha+1)\phi}\int_{-\infty}^{\infty }e^{(\alpha+1+i\phi)}f_T(x_T)dx_T
+\end{equation}
+\begin{equation}
+=\dfrac{e^{-r T}}{\alpha^2+\alpha-\phi^2+i(2\alpha+1)\phi}\int_{-\infty}^{\infty }e^{(-\alpha i-i+\phi)ix_T}f_T(x_T)dx_T
+\end{equation}
+\begin{equation}
+=\dfrac{e^{-r T}F_{C_T}(\phi-(\alpha+1)i)}	{\alpha^2+\alpha-\phi^2+i(2\alpha+1)\phi}
+\end{equation}
+
+So, after finding $F_{c_T}(\phi)$ , this function can be implemented in Equation(3.10) and FFT can be taken to determine call value of the option. 
+
+	Carr and Madan also examined optimized $\alpha$ in their study. They have found that Equation (3.15) should be integrable, thus $F_{c_T}(0)$ should be finite. To accomplish this, $\Phi_T(-(\alpha+1)i)$ should be finite and also:
+\begin{equation}
+E[S^{\alpha+1}_T]<\infty
+\end{equation}
+should be satisfied. So, one can determine $\alpha$  with the given restrictions or boundaries for the selection of $\alpha$. Carr and Madan (1999) further extend Fourier Transform in out-of-money options since these options have no intrinsic value. However, this type of options are not considered in this article.
+
+FFT in discrete form can be seen at the following equation:
+\begin{equation}
+w(k)=\sum^N_{j=1}e^{-i\dfrac{2\pi}{N}(j-1)(k-1)}x(j) \, for \, k=1,2,......,N
+\end{equation}
+Where N is in the order of 2.With the utilization of this form, Carr and Madan formed the following expression,
+\begin{equation}
+C(k_u)=\dfrac{e^{-\alpha k_u}}{\pi}\sum^N_{j=1}e^{-i\dfrac{2\pi}{N}(j-1)(u-1)}e^{ibv_j}\kappa(v_j)\dfrac{\eta}{3}[3+(-1)^j-\delta_{j-1}]
+\end{equation}
+
+This equation for call price is written under the assumption of Simpson's rule. Hence, Equation (3.18) in Carr Madan shows the application of FFT for option pricing. To price options with this formula, n and $\alpha$ values are needed to be selected properly. Moreover, note that the term corresponding to x(j) in Equation (3.17) at Equation (3.18) in Carr Madan returns a vector.
+
+
+\subsection{Calibration} \label{Calibration2}
+
+For calibrating this model, we use the same data and initial parameters as the Heston Closed Form Calibration in section \ref{Calibration1}.
+
+The Fast Fourier model works differently than the closed form model in that it does not have a strike input, and instead it returns a vector of prices at some strikes around the money. In this way, the model calculates a number of prices at once, significantly reducing the number of iterations required to calibrate it.
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Calibrated Parameters} \\
+\hline
+Mean reversion $\kappa$ & 153.9071 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.7273 \\ \hline
+Volatility of the volatility $\sigma$ & 38.9586 \\ \hline
+Long-term mean of variance $\theta$ & 0.0285 \\ \hline
+Variance initial value $V_0$ & 0.1772 \\ \hline
+\end{tabular}
+\caption{Calibrated parameter.}
+\label{tabla:Calibrated Parameters FFT}
+\end{figure}
+
+After calibration, we received the following average squared difference:
+
+\begin{center}
+\framebox[6cm][c]{Error Function = 46.3814}	
+\end{center}
+
+Notably, this is a higher aggregate error term than in the closed form. However, aggregates often fail to tell the whole story, and it may be the case that the Fast Fourier model matched many points perfectly but did extremely poorly at points very far from at the money. We will need more data to safely conclude that one model is more practically accurate than another.
+
+\section{Analysis and Results} \label{Analysis and Results}
+
+
+
+\subsection{Models Effectiveness} \label{Models Effectiveness}
+
+To test the accuracy of the models, we use a subset of the first quarter of data, including contracts from four different days throughout the quarter. We use the calibrated each model on this quarter of data, and use those parameters for each model to test how close the model fit to market prices and implied volatility on each of the test days.
+
+Calibrated parameters for closed form:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Calibrated Parameters} \\
+\hline
+Mean reversion $\kappa$ & 0.7035 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.6751 \\ \hline
+Volatility of the volatility $\sigma$ & 0.9728 \\ \hline
+Long-term mean of variance $\theta$ & 0.2879 \\ \hline
+Variance initial value $V_0$ & 0.0000 \\ \hline
+\end{tabular}
+\caption{Calibrated parameter.}
+\label{tabla:Calibrated Parameters Closed Form}
+\end{figure}
+
+
+
+Here is a plot of the first test day:
+
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{Closed Form Prices vs Market day0.png}
+  \caption{Closed Form Prices vs Market.}
+  \label{fig:CF Prices}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{Closed Form Vol vs Market day0.png}
+  \caption{Closed Form Volatility vs Market.}
+  \label{fig:CF Prices2}
+\end{figure}
+
+
+The calibrated values for the Fast Fourier model for this data set:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Calibrated Parameters} \\
+\hline
+Mean reversion $\kappa$ & 125.5309 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.7.103 \\ \hline
+Volatility of the volatility $\sigma$ & 29.9473 \\ \hline
+Long-term mean of variance $\theta$ & 0.0440 \\ \hline
+Variance initial value $V_0$ & 0.0553 \\ \hline
+\end{tabular}
+\caption{Calibrated parameter.}
+\label{tabla:Calibrated Parameters Closed Form}
+\end{figure}
+
+And the plots for the first test day for FFT:
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{FFT Prices vs Market day0.png}
+  \caption{Fast Fourier Prices vs Market.}
+  \label{fig:CF Prices}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{FFT Vol vs Market day0.png}
+  \caption{Fast Fourier Volatility vs Market.}
+  \label{fig:CF Prices}
+\end{figure}
+
+
+On basic inspection, it seems that the prices given by these models are both relatively accurate, though some oscillation can be seen near the money in the Fast Fourier model. As for implied volatility, neither model fits very well to the market smile, with Fast Fourier showing some aggressive oscillation. To address the argument that these results may be too dependent on the chosen test dates, the following tables show some measurements on the entire first quarter of data. The data is separated into quartiles, with the first row showing the net difference between the model and the market, and the second row showing the average of absolute differences between the model and the market. Larger, more positive, values in the first row show an upward error in the model above the market overall, and larger values in the second row show inaccuracy of the model with respect to the market.
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{2.5cm} | p{2.5cm} | p{2.5cm} | p{2.5cm}|}
+\hline
+\multicolumn{4}{|c|}{Closed Form Prices} \\
+\hline
+ In-the-Money & ITM and ATM & ATM and OTM & Out-the-Money \\ \hline
+0.9958 & -0.4320 & 2.2959 & 1.2780 \\ \hline
+3.8268 & 8.0926  & 8.5197 & 1.9305 \\ \hline
+\end{tabular}
+\caption{Aggregate level price error}
+\label{tabla:Aggregate price error CF}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{2.5cm} | p{2.5cm} | p{2.5cm} | p{2.5cm}|}
+\hline
+\multicolumn{4}{|c|}{Closed form Volatility} \\
+\hline
+ In-the-Money & ITM and ATM & ATM and OTM & Out-the-Money \\ \hline
+-0.0591 & -0.0158 & -0.00076 &  0.00008 \\ \hline
+0.0630 & 0.0261 & 0.0175 & 0.0133 \\ \hline
+\end{tabular}
+\caption{Aggregate Level Volatility Error}
+\label{tabla:Aggregate Vol Error CF}
+\end{figure}
+
+
+
+
+A similar analysis can be done for the Fast Fourier model.
+
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{2.5cm} | p{2.5cm} | p{2.5cm} | p{2.5cm}|}
+\hline
+\multicolumn{4}{|c|}{Fast Fourier Prices} \\
+\hline
+ In-the-Money & ITM and ATM & ATM and OTM & Out-the-Money \\ \hline
+-6.0292 & -8.2438 & -1.0719 & 1.7108 \\ \hline
+8.9698 & 12.5684  & 9.0875 & 1.9717 \\ \hline
+\end{tabular}
+\caption{Aggregate level price error}
+\label{tabla:Aggregate price error FFT}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{2.5cm} | p{2.5cm} | p{2.5cm} | p{2.5cm}|}
+\hline
+\multicolumn{4}{|c|}{Fast Fourier Volatility} \\
+\hline
+ In-the-Money & ITM and ATM & ATM and OTM & Out-the-Money \\ \hline
+-0.0663 & -0.0297 & -0.0072 &  0.0143 \\ \hline
+0.0698 & 0.0348 & 0.0196 & 0.0158 \\ \hline
+\end{tabular}
+\caption{Aggregate Level Volatility Error}
+\label{tabla:Aggregated Vol Error FFT}
+\end{figure}
+
+
+\subsection{Models Efficiency} \label{Models Efficiency}
+
+To test the computational efficiency of both of these models, we time the calibration process. Since calibration involves running the optimization function (in this case the call price functions) multiple times, any differences in efficiency are exacerbated by the calibration process. To compare, we run the calibration on a small amount of data for each model, and record the time to calculate with increasing amounts of data. We used increments of 85 rows of data, since we found in our data that this is close to the amount of options seen on the average day in our data set. 
+The outcome is shown in the following plots:
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.9]{CalibrateTimeCF.png}
+  \caption{Time to Calibrate Closed Form}
+  \label{fig:CF Time}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.9]{CalibrateFFT.png}
+  \caption{Time to Calibrate Fast Fourier}
+  \label{fig:FFT Time}
+\end{figure}
+
+Based on this outcome, we are unable to conclude if the time to compute has a linear relationship with the amount of underlying data, or if the relationship is similar between the two models. Notice however, the scale of the two outcomes. Even for this small amount of data, calibrating the closed form Heston model took close to 20 minutes for some data amounts. This makes it hard to conceive that this could ever be a practical model for use with data sets that would often be much larger than we are using for this test. The Fast Fourier model, on the other hand, never took more than one minute to calibrate. This could likely be further optimized beyond what we were able to do with our model, but it is clear that for those who trade frequently, and would thus like to frequently calibrate their pricing model to the market, the Carr-Madan Fast Fourier model is a strong option.
+
+
+\subsection{Comparison of Calibration Methods} \label{Comparison of Calibration Methods}
+
+Up until now, we have calibrated using a minimization of squared differences in price method. However, we want to compare this with another potential calibration technique: that of minimizing the squared difference of implied volatility. We do this by dividing by the market vega of a given contract. Using this calibration method, we obtain the following optimized parameters:
+
+Heston closed form:
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Calibrated Parameters} \\
+\hline
+Mean reversion $\kappa$ & 1.5061 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.6921 \\ \hline
+Volatility of the volatility $\sigma$ & 0.5364 \\ \hline
+Long-term mean of variance $\theta$ & 0.1241 \\ \hline
+Variance initial value $V_0$ & 0.0000 \\ \hline
+Initial Guess & 0.35 \\ \hline
+Vol Accuracy & 0.00001 \\ \hline
+\end{tabular}
+\caption{Calibrated parameter.}
+\label{tabla:Calibrated Parameters Closed Form}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tabular}{| p{6.5cm}| p{2.0cm} |}
+\hline
+\multicolumn{2}{|c|}{Calibrated Parameters} \\
+\hline
+Mean reversion $\kappa$ & 1.3062 \\ \hline
+Correlation between Brownian Motions $\rho$ & -0.7263 \\ \hline
+Volatility of the volatility $\sigma$ & 0.7838\\ \hline
+Long-term mean of variance $\theta$ & 0.0000 \\ \hline
+Variance initial value $V_0$ & 0.0000 \\ \hline
+Initial Guess & 0.35 \\ \hline
+Vol Accuracy & 0.00001 \\ \hline
+\end{tabular}
+\caption{Calibrated parameter.}
+\label{tabla:Calibrated Parameters FFT}
+\end{figure}
+
+The last two parameters, Initial Guess and Vol Accuracy, are necessary for using the Newton Raphson method to convert the prices of the model into implied volatility by iterating on the Black-Scholes formula.
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{(Vega) Closed Form Prices vs Market day0.png}
+  \caption{Closed Form Prices vs Market.}
+  \label{fig:CF Prices}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{(Vega) FFT Prices vs Market day0.png}
+  \caption{Fast Fourier Prices vs Market.}
+  \label{fig:CF Prices}
+\end{figure}
+
+With basic visual inspection, it is clear that this is less accurate than the former calibration method, likely due to the inaccurate implied volatility smile obtained by the model, as seen earlier.
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{(Vega) Closed Form Vol vs Market day0.png}
+  \caption{Closed Form Volatility vs Market.}
+  \label{fig:CF Vol}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+   \includegraphics[scale=0.7]{(Vega) FFT Vol vs Market day0.png}
+  \caption{Fast Fourier Volatility vs Market.}
+  \label{fig:FFT Vol}
+\end{figure}
+
+\subsubsection{Potential Improvements to Calibration Method} \label{Improvements}
+
+We realize there is room for improvement in the calibration method beyond simply the choice between optimizing prices or implied volatility. In this paper, constrained optimization was used, with constraints that all parameters be positive, except $\rho$, which must be between -1 and 1. Since constrained optimization can sometimes produce sub-optimal results, one potential remedy is to map each parameter to a term that is naturally bounded to the desired constraint. We attempted to do this by mapping $\rho$ to a hyperbolic tangent function and the remaining functions to an exponential, as shown here:
+
+\begin{equation} \rho \rightarrow \dfrac{e^{x} - e^{-x}} {e^{x} + e^{-x}} \end{equation} 
+\begin{equation} other \: parameters \rightarrow e^{x} \end{equation}
+
+However, we were not successful with this attempt. Plots for the closed form calibration came back identical to the hard-constrained version, and Fast Fourier calibration failed with the optimizer reaching the maximum possible number of iterations without a successful output. This is an area where other researchers can attempt to improve on our calibration methods.
+\newpage
+
+\section{Conclusion} \label{Conclusion}
+
+In this paper, we have outlined the derivations for the Heston stochastic volatility model and the Carr-Madan Fast Fourier Transform model. Hopefully, readers will understand the motivations behind the development of both models, as well as be able to build implementations themselves to replicate the results obtained here.
+
+
+	After testing both models, it is clear that the errors from the Fast Fourier transform method are in fact higher than those of the Heston closed form model. Conversely, the time it takes to calibrate the closed form model makes it not viable for any practical use, and the slightly more accurate results do not justify the order of magnitude difference in calibration time. 
+
+
+	Further, we have explored the importance of calibration in using any model with practical data. For our case, we have shown that calibration via minimizing squared differences in prices is more accurate than that of implied volatility when obtaining call option prices.
+
+\newpage
+
+\section{References} \label{References}
+
+[1]Yang, Yuan, "Valuing a European option with the Heston model" (2013). Thesis. Rochester Institute of Technology. 
+
+[2] Crisostomo, R. (2014, December). An Analysis of the Heston Stochastic Volatility Model:
+Implementation and Calibration using Matlab. Retrieved from https://arxiv.org/pdf/1502.02963.pdf
+
+[3] Moodley, N. (2005) The Heston Model: A Practical Approach with Matlab Code. B.Sc. Thesis, University of the Witwatersrand, Johannesburg.
+
+[4] Carr, P. and Madan, D. B. (1999), 'Option evaluation the using fast Fourier transform', \textit{Journal of Computational Finance} 2(4), 61-73.
+
+[5] Goodman, B. (2016). \textit{Sequential quadratic programming}. Retrieved from https://optimization.
+
+mccormick.northwestern.edu/index.php/Sequentia$l\_$quadratic$\_$programming
+
+
+\end{document}
